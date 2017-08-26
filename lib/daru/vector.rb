@@ -906,7 +906,9 @@ module Daru
     end
 
     # Convert to html for iruby
-    def to_html threshold=30
+    def to_html(threshold=30)
+      table_thead = to_html_thead
+      table_tbody = to_html_tbody(threshold)
       path = if index.is_a?(MultiIndex)
                File.expand_path('../iruby/templates/vector_mi.html.erb', __FILE__)
              else
@@ -915,8 +917,28 @@ module Daru
       ERB.new(File.read(path).strip).result(binding)
     end
 
+    def to_html_thead
+      table_thead_path =
+        if index.is_a?(MultiIndex)
+          File.expand_path('../iruby/templates/vector_mi_thead.html.erb', __FILE__)
+        else
+          File.expand_path('../iruby/templates/vector_thead.html.erb', __FILE__)
+        end
+      ERB.new(File.read(table_thead_path).strip).result(binding)
+    end
+
+    def to_html_tbody(threshold=30)
+      table_tbody_path =
+        if index.is_a?(MultiIndex)
+          File.expand_path('../iruby/templates/vector_mi_tbody.html.erb', __FILE__)
+        else
+          File.expand_path('../iruby/templates/vector_tbody.html.erb', __FILE__)
+        end
+      ERB.new(File.read(table_tbody_path).strip).result(binding)
+    end
+
     def to_s
-      to_html
+      "#<#{self.class}#{': ' + @name.to_s if @name}(#{size})#{':category' if category?}>"
     end
 
     # Create a summary of the Vector
@@ -985,7 +1007,7 @@ module Daru
     def inspect spacing=20, threshold=15
       row_headers = index.is_a?(MultiIndex) ? index.sparse_tuples : index.to_a
 
-      "#<#{self.class}(#{size})#{':cataegory' if category?}>\n" +
+      "#<#{self.class}(#{size})#{':category' if category?}>\n" +
         Formatters::Table.format(
           to_a.lazy.map { |v| [v] },
           headers: @name && [@name],
@@ -1493,7 +1515,7 @@ module Daru
         else raise ArgumentError, "Unknown dtype #{dtype}"
         end
 
-      @dtype = dtype || :array
+      @dtype = dtype
       new_vector
     end
 

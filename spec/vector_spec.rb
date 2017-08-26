@@ -84,6 +84,11 @@ describe Daru::Vector do
           expect(dv.index.to_a).to eq(['a', 'b', :r, 0])
         end
 
+        it "initializes array with nils with dtype NMatrix" do
+          dv = Daru::Vector.new [2, nil], dtype: :nmatrix
+          expect(dv.to_a).to eq([2, nil])
+          expect(dv.index.to_a).to eq([0, 1])
+        end
       end
 
       context "#reorder!" do
@@ -358,6 +363,9 @@ describe Daru::Vector do
           let (:idx) { Daru::Index.new [1, 0, :c] }
           let (:dv) { Daru::Vector.new ['a', 'b', 'c'], index: idx }
 
+          let (:idx_dt) { Daru::DateTimeIndex.new(['2017-01-01', '2017-02-01', '2017-03-01']) }
+          let (:dv_dt) { Daru::Vector.new(['a', 'b', 'c'], index: idx_dt) }
+
           context "single position" do
             it { expect(dv.at 1).to eq 'b' }
           end
@@ -404,6 +412,15 @@ describe Daru::Vector do
             its(:size) { is_expected.to eq 1 }
             its(:to_a) { is_expected.to eq ['a'] }
             its(:'index.to_a') { is_expected.to eq [1] }
+          end
+
+          context "Splat .at on DateTime index" do
+            subject { dv_dt.at(*[1,2]) }
+
+            it { is_expected.to be_a Daru::Vector }
+            its(:size) { is_expected.to eq 2 }
+            its(:to_a) { is_expected.to eq ['b', 'c'] }
+            its(:'index.to_a') { is_expected.to eq ['2017-02-01', '2017-03-01'] }
           end
         end
 
@@ -996,6 +1013,26 @@ describe Daru::Vector do
         end
 
         its(:to_json) { is_expected.to eq(vector.to_h.to_json) }
+      end
+
+      context "#to_s" do
+        before do
+          @v = Daru::Vector.new ["a", "b"], index: [1, 2]
+        end
+
+        it 'produces a class, size description' do
+          expect(@v.to_s).to eq("#<Daru::Vector(2)>")
+        end
+
+        it 'produces a class, name, size description' do
+          @v.name = "Test"
+          expect(@v.to_s).to eq("#<Daru::Vector: Test(2)>")
+        end
+
+        it 'produces a class, name, size description when the name is a symbol' do
+          @v.name = :Test
+          expect(@v.to_s).to eq("#<Daru::Vector: Test(2)>")
+        end
       end
 
       context "#uniq" do

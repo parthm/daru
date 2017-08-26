@@ -634,7 +634,7 @@ module Daru
     #     b: [:a,  :b,          nil, Float::NAN, nil,        3,   5,   8],
     #     c: ['a',  Float::NAN, 3,   4,          3,          5,   nil, 7]
     #   }, index: 11..18)
-    #   df
+    #   df.replace_values nil, Float::NAN
     #   # => #<Daru::DataFrame(8x3)>
     #   #       a   b   c
     #   #   11   1   a   a
@@ -1870,7 +1870,9 @@ module Daru
     end
 
     # Convert to html for IRuby.
-    def to_html threshold=30
+    def to_html(threshold=30)
+      table_thead = to_html_thead
+      table_tbody = to_html_tbody(threshold)
       path = if index.is_a?(MultiIndex)
                File.expand_path('../iruby/templates/dataframe_mi.html.erb', __FILE__)
              else
@@ -1879,8 +1881,28 @@ module Daru
       ERB.new(File.read(path).strip).result(binding)
     end
 
+    def to_html_thead
+      table_thead_path =
+        if index.is_a?(MultiIndex)
+          File.expand_path('../iruby/templates/dataframe_mi_thead.html.erb', __FILE__)
+        else
+          File.expand_path('../iruby/templates/dataframe_thead.html.erb', __FILE__)
+        end
+      ERB.new(File.read(table_thead_path).strip).result(binding)
+    end
+
+    def to_html_tbody(threshold=30)
+      table_tbody_path =
+        if index.is_a?(MultiIndex)
+          File.expand_path('../iruby/templates/dataframe_mi_tbody.html.erb', __FILE__)
+        else
+          File.expand_path('../iruby/templates/dataframe_tbody.html.erb', __FILE__)
+        end
+      ERB.new(File.read(table_tbody_path).strip).result(binding)
+    end
+
     def to_s
-      to_html
+      "#<#{self.class}#{': ' + @name.to_s if @name}(#{nrows}x#{ncols})>"
     end
 
     # Method for updating the metadata (i.e. missing value positions) of the
@@ -2240,7 +2262,7 @@ module Daru
       if @index.empty?
         insert_vector_in_empty name, vector
       else
-        vec = prepare_vector_for_insert name, vector
+        vec = prepare_for_insert name, vector
 
         assign_or_add_vector name, vec
       end
@@ -2287,25 +2309,35 @@ module Daru
       @data.map! { |v| v.empty? ? v.reindex(@index) : v }
     end
 
-    def prepare_vector_for_insert name, vector
-      if vector.is_a?(Daru::Vector)
-        # so that index-by-index assignment is avoided when possible.
-        return vector.dup if vector.index == @index
-
-        Daru::Vector.new([], name: coerce_name(name), index: @index).tap { |v|
-          @index.each do |idx|
-            v[idx] = vector.index.include?(idx) ? vector[idx] : nil
-          end
-        }
+    def prepare_for_insert name, arg
+      if arg.is_a? Daru::Vector
+        prepare_vector_for_insert name, arg
+      elsif arg.respond_to?(:to_a)
+        prepare_enum_for_insert name, arg
       else
-        # FIXME: No spec checks this case... And SizeError is not a thing - zverok, 2016-05-08
-        if @size != vector.size
-          raise SizeError,
-            "Specified vector of length #{vector.size} cannot be inserted in DataFrame of size #{@size}"
-        end
-
-        Daru::Vector.new(vector, name: coerce_name(name), index: @index)
+        prepare_value_for_insert name, arg
       end
+    end
+
+    def prepare_vector_for_insert name, vector
+      # so that index-by-index assignment is avoided when possible.
+      return vector.dup if vector.index == @index
+      Daru::Vector.new([], name: coerce_name(name), index: @index).tap { |v|
+        @index.each do |idx|
+          v[idx] = vector.index.include?(idx) ? vector[idx] : nil
+        end
+      }
+    end
+
+    def prepare_enum_for_insert name, enum
+      if @size != enum.size
+        raise "Specified vector of length #{enum.size} cannot be inserted in DataFrame of size #{@size}"
+      end
+      Daru::Vector.new(enum, name: coerce_name(name), index: @index)
+    end
+
+    def prepare_value_for_insert name, value
+      Daru::Vector.new(Array(value) * @size, name: coerce_name(name), index: @index)
     end
 
     def insert_or_modify_row indexes, vector

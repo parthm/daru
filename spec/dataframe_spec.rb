@@ -524,10 +524,29 @@ describe Daru::DataFrame do
           index: [:one, :two, :three, :four, :five]))
       end
 
+      it "assigns new vector with default length if given just a value" do
+        @df[:d] = 1.0
+        expect(@df[:d]).to eq(Daru::Vector.new([1.0, 1.0, 1.0, 1.0, 1.0],
+        index: [:one, :two, :three, :four, :five], name: :d))
+      end
+
+      it "updates vector with default length if given just a value" do
+        @df[:c] = 1.0
+        expect(@df[:c]).to eq(Daru::Vector.new([1.0, 1.0, 1.0, 1.0, 1.0],
+        index: [:one, :two, :three, :four, :five], name: :c))
+      end
+
       it "appends an Array as a Daru::Vector" do
         @df[:d] = [69,99,108,85,49]
 
         expect(@df.d.class).to eq(Daru::Vector)
+      end
+
+      it "appends an arbitrary enumerable as a Daru::Vector" do
+        @df[:d] = Set.new([69,99,108,85,49])
+
+        expect(@df[:d]).to eq(Daru::Vector.new([69, 99, 108, 85, 49],
+        index: [:one, :two, :three, :four, :five], name: :c))
       end
 
       it "replaces an already present vector" do
@@ -1580,6 +1599,13 @@ describe Daru::DataFrame do
 
     it 'has synonym' do
       expect(@data_frame.first(2)).to eq(@data_frame.head(2))
+    end
+
+    it 'works on DateTime indexes' do
+      idx = Daru::DateTimeIndex.new(['2017-01-01', '2017-02-01', '2017-03-01'])
+      df = Daru::DataFrame.new({col1: ['a', 'b', 'c']}, index: idx)
+      first = Daru::DataFrame.new({col1: ['a']}, index: Daru::DateTimeIndex.new(['2017-01-01']))
+      expect(df.head(1)).to eq(first)
     end
   end
 
@@ -3832,8 +3858,18 @@ describe Daru::DataFrame do
   end
 
   context '#to_s' do
-    it 'produces something, despite of how reasonable you think it is' do
-      expect(@data_frame.to_s).to eq @data_frame.to_html
+    it 'produces a class, size description' do
+      expect(@data_frame.to_s).to eq "#<Daru::DataFrame(5x3)>"
+    end
+
+    it 'produces a class, name, size description' do
+      @data_frame.name = "Test"
+      expect(@data_frame.to_s).to eq "#<Daru::DataFrame: Test(5x3)>"
+    end
+
+    it 'produces a class, name, size description when the name is a symbol' do
+      @data_frame.name = :Test
+      expect(@data_frame.to_s).to eq "#<Daru::DataFrame: Test(5x3)>"
     end
   end
 
